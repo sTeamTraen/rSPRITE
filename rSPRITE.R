@@ -1,94 +1,163 @@
-# Written by Nick Brown (nicholasjlbrown@gmail.com), 2018-2019.
+# Written by Nick Brown (nicholasjlbrown@gmail.com), 2018-2020.
 # This work is licensed under a Creative Commons Attribution 4.0 International License (CC-BY).
 #  See http://creativecommons.org/licenses/by/4.0/
-# Thanks to Cédric Batailler for help with the X-axis.
+# Thanks to CÃ©dric Batailler for help with the X-axis.
 
 # Version history
-# 2018-02-19 16:08Z 0.01
+# 2018-02-19 16:08 UTC 0.01
 #   First Shiny version released.
-# 2018-02-19 17:23Z 0.02
+# 2018-02-19 17:23 UTC 0.02
 #   Improved the look of the X-axis (numbers can go sideways if they start to bunch up).
 #   Added an upper limit for the X-axis for when no items get close to the scale maximum.
 #   Added code to use human-friendly intervals on the Y-axis.
-# 2018-02-19 18:31Z 0.03
+# 2018-02-19 18:31 UTC 0.03
 #   Fixed a bug that caused a previous error/warning message to hang around on the next run.
 #   Added version number display
-# 2018-02-19 21:43Z 0.04
+# 2018-02-19 21:43 UTC 0.04
 #   Added input elements to allow a specific response value to appear a fixed number of times.
-# 2018-02-20 17:21Z 0.05
+# 2018-02-20 17:21 UTC 0.05
 #   Fixed a bug that caused a crash 50% of the time when scaleMin and scaleMax were both negative.
 #   Added dynamic updates of upper/lower bounds of input controls, depending on the values of others.
-# 2018-02-21 15:07Z 0.06
+# 2018-02-21 15:07 UTC 0.06
 #   Fixed a bug that caused spurious error messages with certain fixed-value configurations.
 #   Plots now appear sorted from smallest to largest skewness.
 #   Added a rudimentary help feature.
 #   Fixed a bug that meant that the user couldn't easily type in a SD close to the permitted minimum.
 #   Fixed a bug that could cause errors in extreme cases with delta=2 in rSprite.delta.
 #   Improved performance by taking a pragmatic decision about when to stop looking for duplicates.
-# 2018-02-21 23:22Z 0.07
+# 2018-02-21 23:22 UTC 0.07
 #   Added link to enable user to download the data that went into the plots.
 #   Fixed a bug that was preventing solutions from being found with very large means and very small SDs.
-# 2018-03-03 23:46Z 0.08
+# 2018-03-03 23:46 UTC 0.08
 #   Increased the size of the plot area.
 #   Increased maximum grid size to 10 x 10.
 #   Changed plot bar colour for better visibility if black text encroaches on bars.
 #   Reduced the chances of missing a valid solution when only a few (requested number > n > 1) exist.
 #   Changed displayed name to rSprite.
-# 2018-03-24 15:00Z 0.09
+# 2018-03-24 15:00 UTC 0.09
 #   Display solutions on the smallest grid that they will fit onto.
 #   User now chooses the number of results they want, not the grid size.
 #   Moved the decimal places input field to just below the mean and SD.
 #   Fixed a bug that could cause spurious solutions to be returned if none were possible.
-# 2018-03-27 20:23Z 0.10
-#   Fixed a bug that could cause the "No solutions found" message to be split into two.
+# 2018-03-27 20:23 UTC 0.10
+#   Fixed a bug that could cause the "No solution found" message to be split into two.
 #   Fixed a bug that prevented entering 0 or a negative number as the fixed value.
 #   Fixed a bug that prevented a solution from being found in some extreme circumstances.
 #   Fixed a bug that produced variable bar widths with large X-axis ranges.
-# 2018-04-18 13:50Z 0.11
+# 2018-04-18 13:50 UTC 0.11
 #   Fixed a bug that prevented the SD granularity from being changed.
 #   Tightened the restrictions on the maximum SD that can be entered.
 #   Moved the scale limit fields to the top of the list.
 #   Fixed a small bug that sometimes showed more ticks than necessary on the X-axis.
 #   Allow fixed values to be outside the scale range.
-# 2018-05-22 13:32Z 0.12
+#   Changed displayed name to rSPRITE.
+# 2018-05-22 13:32 UTC 0.12
 #   Fixed a bug that caused a failure to calculate the possible SD range in some extreme samples.
-# 2018-05-26 19:27Z 0.13
+# 2018-05-26 19:27 UTC 0.13
 #   Added note about privatcy to the help text.
 #   Added blank line before download link.
 #   Added "loading" spinner image.
-# 2018-11-08 23:40Z 0.14
+# 2018-11-08 23:40 UTC 0.14
 #   Increased the size of the plot area.
 #   Changed help text to point to preprint article instead of James's blog post.
 #   Added CC-BY license.
 #   Fixed a small bug that caused slightly different X-axis widths depending on the data.
-# 2019-06-02 20:56Z 0.15
+# 2019-06-02 20:56 UTC 0.15
 #   Fixed a bug that could cause valid SDs to be rejected as too small with means near the scale limits.
-#
-# To do:
-# Check when to turn X-axis numbers sideways, eg 13-77 N=345 M=26 SD=12, one pane.
+# 2020-06-23 21:34 UTC 0.16
+#   Increased maximum sample size to 10000.
+#   Fixed a bug that could make it impossible to enter a target SD in a small number of cases.
+#   Added code to make input fields slightly less reactive.
+#       I am trying two ways to avoid the Shiny reactivity issue whereby with, for example,
+#       scale value min=3 and max=50, the user wants to type 25 for the mean but the 2 immediately gets changed to 3.
+#       #limits: include/exclude these lines to toggle automatic checking of mean/SD limits
+#       #bounce: include/exclude these lines to toggle debouncing of mean/SD values
+#       In version 0.16, I'm including the "debounce" code. The alternative is to not check the limits.
+#   Fixed a bug that could cause the samples to be biased towards smaller numbers in the range, especially with more extreme SDs
+#    (thanks to Frank Gootjes for pointing this out).
+#   Changed performance parameters to reduce the chance of missing a valid solution, especially with fixed values.
+#   Added a progress counter to keep track of unique solutions as they are found.
+#   Added a message to indicate when searching has finished and plotting of the results has started.
 
-# To think about (could be hard):
-# Allow zero as a number of a fixed value (i.e., that value does not appear).
-# From Jordan: If no solution is found, print SD of nearest solution.
+# To do (some of these could be hard):
+# Check when to turn X-axis numbers sideways, eg 13-77 N=345 M=26 SD=12, one pane.
+# Allow zero as a number of a fixed value (i.e., that value explicitly does not appear).
+# Idea: If no solution is found, print SD of nearest solution.
 
 library(ggplot2)
 library(gridExtra)
 library(moments)
 library(shiny)
 
+# Parameters that trade off speed versus completeness.
+# maxDeltaLoopsLower controls how many times we tweak pairs of numbers before giving up hope of finding any solution;
+#  it is the lower bound on a formula that includes the sample size and range.
+# maxDeltaLoopsUpper is the absolute upper bound on that formula (a sanity check, in effect).
+# maxDupLoops controls how many times we try to find another unique solution, when we know that at least one exists.
+rSprite.maxDeltaLoopsLower <- 10000
+rSprite.maxDeltaLoopsUpper <- 1000000
+rSprite.maxDupLoops <- 8
+
+# Code taken from https://gist.github.com/jcheng5/6141ea7066e62cafb31c
+# Returns a reactive that debounces the given expression by the given time in milliseconds.
+#
+# This is not a true debounce in that it will not prevent \code{expr} from being called many times
+#  (in fact it may be called more times than usual), but rather, the reactive invalidation signal that is
+#  produced by expr is debounced instead. This means that this function should be used when \code{expr} is
+# cheap but the things it will trigger (outputs and reactives that use \code{expr}) are expensive.
+debounce <- function(expr, millis, env=parent.frame(), quoted=FALSE, domain=getDefaultReactiveDomain()) {
+  force(millis)
+
+  f <- exprToFunction(expr, env, quoted)
+  label <- sprintf("debounce(%s)", paste(deparse(body(f)), collapse = "\n"))
+
+  v <- reactiveValues(
+    trigger = NULL,
+    when = NULL # the deadline for the timer to fire; NULL if not scheduled
+  )
+
+  # Responsible for tracking when f() changes.
+  observeEvent(f(), {
+    # The value changed. Start or reset the timer.
+    v$when <- Sys.time() + millis/1000
+  }, ignoreNULL = FALSE)
+
+  # This observer is the timer. It rests until v$when elapses, then touches v$trigger.
+  observe({
+    if (is.null(v$when)) {
+      return()
+    }
+
+    now <- Sys.time()
+    if (now >= v$when) {
+      v$trigger <- runif(1)
+      v$when <- NULL
+    }
+    else {
+      invalidateLater((v$when - now) * 1000, domain)
+    }
+  })
+
+  # This is the actual reactive that is returned to the user. It returns the
+  # value of f(), but only invalidates/updates when v$trigger is touched.
+  eventReactive(v$trigger, {
+    f()
+  }, ignoreNULL = FALSE)
+}
+
 rSprite.huge <- 1e15
 rSprite.dust <- 1e-12
 
-# Store a message for future display (unless otherwisde specified).
+# Store a message for future display (unless otherwise specified).
 # If we have unloaded Shiny for debugging, show the message immediately.
-rSprite.message <- function (s, shinyType="default", shinyNow=FALSE) {
+rSprite.message <- function (s, shinyType="default", showNow=FALSE) {
   if (!exists("shinyUI")) {
     cat("rSPRITE message: |", s, "| (shinyType=", shinyType, ")", "\n", sep="")
     return()
   }
 
   message <- paste(shinyType, s, sep="%%")
-  if (shinyNow) {
+  if (showNow) {
     rSprite.shinyMessages(list(message))
   }
   else {
@@ -102,9 +171,9 @@ rSprite.checkGrim <- function (N, tMean, dp) {
   int <- round(tMean * N)           # nearest integer; doesn't matter if this rounds up or down
   frac <- int / N
   dif <- abs(tMean - frac)
-  gran <- ((0.1 ^ dp) / 2) + rSprite.dust   # allow for rounding errors
-  if (dif > gran) {
-    gMean <- round(int / N, dp)
+  granule <- ((0.1 ^ dp) / 2) + rSprite.dust   # allow for rounding errors
+  if (dif > granule) {
+    gMean <- round(frac, dp)
     dpformat <- paste("%.", dp, "f", sep="")
     s <- paste("Mean ", sprintf(dpformat, tMean), " fails GRIM test - using ", sprintf(dpformat, gMean), sep="")
     rSprite.message(s, shinyType="warning")
@@ -115,11 +184,11 @@ rSprite.checkGrim <- function (N, tMean, dp) {
 
 # Determine minimum and maximum SDs for given scale ranges, N, and mean.
 rSprite.sdLimits <- function (N, tMean, scaleMin, scaleMax, dp) {
-  result <- c(rSprite.huge, -rSprite.huge)      # impossible values
+  result <- c(rSprite.huge, -rSprite.huge)        # impossible values
 
-  aMax <- scaleMin                              # "aMax" means "value of a to produce the max SD"
+  aMax <- scaleMin                                # "aMax" means "value of a to produce the max SD"
   aMin <- floor(tMean)
-  bMax <- max(scaleMax, scaleMin + 1, aMin + 1) # sanity check (just scaleMax would normally be ok)
+  bMax <- max(scaleMax, scaleMin + 1, aMin + 1)   # sanity check (just scaleMax would normally be ok)
   bMin <- aMin + 1
   total <- round(tMean * N)
   for (abm in list(c(aMin, bMin, 1), c(aMax, bMax, 2))) {
@@ -128,7 +197,7 @@ rSprite.sdLimits <- function (N, tMean, scaleMin, scaleMax, dp) {
     m <- abm[3]
 
     k <- round((total - (N * b)) / (a - b))
-    k <- min(max(k, 1), N - 1)   # ensure there is at least one of each of two numbers
+    k <- min(max(k, 1), N - 1)               # ensure there is at least one of each of two numbers
     vec <- c(rep(a, k), rep(b, N - k))
     diff <- sum(vec) - total
     if ((diff < 0) && (k > 1)) {
@@ -148,110 +217,108 @@ rSprite.sdLimits <- function (N, tMean, scaleMin, scaleMax, dp) {
 #  thus preserving the mean, but occasionally it will just do one of those things,
 #  if the resulting mean is still GRIM-consistent.
 rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c()) {
-# Most of the time we change a pair of numbers by +/- 1, but 2 allows us to jump over fixed numbers.
-  delta <- 1
-  if (    (runif(1) < 0.2)
-       && ((length(vec[vec > (scaleMin + 1)])) > 0)    # Check there is a number we can decrement by 2!
-     ) {
-    delta <- 2
-  }
+  originalVec <- vec
 
-# Select an element to decrement. This should be greater than the minimum, and not
-#  1 greater than a fixed value (because decrementing it would give us the fixed value).
-# For better performance, at the risk of modest bias, we select from unique elements only.
-  uniqueCanDec <- !duplicated(vec)
-  notFixedDec <- if (length(fixed) > 0) !(vec %in% (fixed + delta)) else TRUE
-  indexCanDec <- uniqueCanDec & (vec > (scaleMin + delta - 1)) & notFixedDec
-  if (length(indexCanDec) == 0) {
-    return(vec)           # Go back and try again.
-  }
+# Decide if we want to increment or decrement first.
+  incFirst <- (runif(1) < 0.5)
 
 # Decide if we need to increase or decrease the SD.
   fullVec <- c(vec, fixed)
   increaseSD <- (sd(fullVec) < tSD)
 
-# If we want to make the SD larger, there is no point in decrementing the largest item,
-#  unless we have no choice.
+# Most of the time we change a pair of numbers by +/- 1, but changing by +/- 2 allows us to jump over fixed numbers.
+  absDelta <- 1
+  if (    (length(fixed) > 0)
+       && (runif(1) < 0.2)
+     ) {
+    # Check there is at least one number that we can increment or decrement by 2!
+    TwoFromEnd <- if (incFirst) (vec < (scaleMax - 1)) else (vec > (scaleMin + 1))
+    if ((length(vec[TwoFromEnd])) > 0) {
+      absDelta <- 2
+    }
+  }
+
+  maxToInc <- scaleMax - absDelta                       # maximum value that we can increment
+  minToDec <- scaleMin + absDelta                       # minimum value that we can decrement
+
+# Select an element to increment or decrement.
+# For better performance, we select from unique elements only; this means that any number that appears in the vector is
+#  equally likely to be chosen regardless of how often it appears. I'm not sure if this is good or bad.
+  uniqueCanBump1 <- !duplicated(vec)
+  delta1 <- if (incFirst) absDelta else -absDelta     # actual value we will add when bumping first number
+
+# The element that we change should be less than the maximum (increment) or greater than the minimum (decrement).
+# It should also not be <delta> less/greater than a fixed value (because adding delta would give us the fixed value).
+  notFixed1 <- if (length(fixed) > 0) !(vec %in% (fixed - delta1)) else TRUE
+  notEdge1 <- if (delta1 > 0) (vec <= maxToInc) else (vec >= minToDec)
+  indexCanBump1 <- uniqueCanBump1 & notFixed1 & notEdge1
+
+# If we can't find an element to change, just return the original vector and let our caller sort it out.
+  if (sum(indexCanBump1) == 0) {
+    return(originalVec)
+  }
+
+# Unless we have no other choice:
+# - If we want to make the SD larger, there is no point in incrementing the smallest element, or decrementing the largest
+# - If we want to make the SD smaller, there is no point in decrementing the smallest element, or incrementing the largest
   if (increaseSD) {
-    indexCanDecTry1 <- indexCanDec & (vec < max(vec))
-    if (sum(indexCanDecTry1) > 0) {
-      indexCanDec <- indexCanDecTry1
-    }
-  }
-
-  whichCanDec <- which(indexCanDec)
-  whichWillDec <- whichCanDec[as.integer(runif(1) * length(whichCanDec)) + 1];
-  willDec <- vec[whichWillDec]
-
-# Select an element to increment. This should be smaller than the maximum,
-#  and not 1 less than a fixed value.
-  vecInc <- vec
-  vecInc[whichWillDec] <- rSprite.huge        # mark the element that we decremented, so we can exclude it
-  uniqueCanInc <- !duplicated(vecInc)
-  notFixedInc <- if (length(fixed) > 0) !(vecInc %in% (fixed - delta)) else TRUE
-  indexCanInc <- uniqueCanInc & (vecInc < (scaleMax - delta + 1)) & (vecInc != rSprite.huge) & notFixedInc
-
-# If we want to make the SD smaller, there is no point in incrementing an item larger than
-#   the one that we are going to decrement, unless we have no other choice.
-  if (!increaseSD) {
-    indexCanIncTry1 <- indexCanInc & (vec < willDec)
-    if (sum(indexCanIncTry1) > 0) {
-      indexCanInc <- indexCanIncTry1
-    }
-  }
-
-# There is no point in incrementing an element that is <delta> smaller than the one
-#  that we are going to decrement, unless we have no other choice.
-  dontInc <- willDec - delta
-  indexCanIncTry2 <- indexCanInc & (vecInc != dontInc)
-  if (sum(indexCanIncTry2) > 0) {
-    indexCanInc <- indexCanIncTry2
-  }
-
-# If we can't find an element to increment, just return the current vector unchanged and let our caller sort it out.
-  if (sum(indexCanInc) < 1) {
-    return(vec)           # Go back and try again.
-  }
-
-  whichCanInc <- which(indexCanInc)
-  whichWillInc <- whichCanInc[as.integer(runif(1) * length(whichCanInc)) + 1];
-
-# Another option is to only change one of the cells (decrement one without incrementing another,
-#  or vice versa).
-# This enables us to explore different means that still round to the same target value.
-# I could have probably written this more elegantly if I'd thought of this issue before I wrote
-#  the code above to select candidates to be both incremented and decremented, but there we are.
-# So what we do here is to perform either the decrement or the increment first, and then see if
-#  the mean is still GRIM-consistent with the target mean. If it is, in a proportion of cases,
-#  we don't adjust the other cell.
-# This can probably be optimised further, by considering whether we want to increase or decrease the SD.
-# For some reason that I don't understand, the most "even" exploration of the means seems to occur
-#  if the proportion of cases where we change the mean is not too large.
-
-  decFirst <- (runif(1) < 0.5)
-  if (decFirst) {
-    vec[whichWillDec] <- vec[whichWillDec] - delta
+    noPoint1 <- if (incFirst) (vec == min(vec)) else (vec == max(vec))
   }
   else {
-    vec[whichWillInc] <- vec[whichWillInc] + delta
+    noPoint1 <- if (incFirst) (vec == maxToInc) else (vec == minToDec)
+  }
+  indexCanBump1Try <- indexCanBump1 & (! noPoint1)
+  if (sum(indexCanBump1Try) > 0) {
+    indexCanBump1 <- indexCanBump1Try
   }
 
-  doInc <- TRUE
-  if (runif(1) < 0.1) {
-    newFullVec <- c(vec, fixed)
-    newMean <- mean(newFullVec)
-    if (round(newMean, dp) == tMean) {         # New mean is GRIM-consistent, so we will keep it.
-      doInc <- FALSE
-    }
-  }
+  whichCanBump1 <- which(indexCanBump1)
+  whichWillBump1 <- whichCanBump1[as.integer(runif(1) * length(whichCanBump1)) + 1];
+  willBump1 <- vec[whichWillBump1]
+  vec[whichWillBump1] <- vec[whichWillBump1] + delta1
 
-  if (doInc) {
-    if (decFirst) {
-      vec[whichWillInc] <- vec[whichWillInc] + delta
+# At this point we can decide to only change one of the elements (decrement one without incrementing another, or vice versa).
+# This enables us to explore different means that still round to the same target value.
+# So here we perform the first increment or decrement first, and see if the mean is still GRIM-consistent with the target mean.
+# If it is, then in a proportion of cases we don't adjust the other cell.
+  newFullVec <- c(vec, fixed)
+  newMean <- mean(newFullVec)
+  meanChanged <- (round(newMean, dp) != tMean) # new mean is no longer GRIM-consistent
+
+  if (meanChanged || (runif(1) < 0.4)) {
+    delta2 <- -delta1                          # apply the opposite delta to a different element
+    vecBump2 <- vec                            # make a scratch copy of the input vector so we can change it
+    vecBump2[whichWillBump1] <- rSprite.huge   # remove the element chosen in part 1...
+    uniqueCanBump2 <- !duplicated(vecBump2)    # ... but if there was more than one copy of that, it's still a candidate
+    notFixed2 <- if (length(fixed) > 0) !(vec %in% (fixed - delta2)) else TRUE
+    notEdge2 <- if (delta2 > 0) (vec <= maxToInc) else (vec >= minToDec)
+    indexCanBump2 <- uniqueCanBump2 & notFixed2 & notEdge2 & (vecBump2 != rSprite.huge)
+
+# If we can't find an element to change in the opposite direction to the first, then if the mean with the first change is still OK,
+#  we return either the vector with that change. Otherwise we return the original vector and let our caller sort it out.
+    if (sum(indexCanBump2) == 0) {
+      return(if (meanChanged) originalVec else vec)
     }
-    else {
-      vec[whichWillDec] <- vec[whichWillDec] - delta
+
+# Unless we have no other choice:
+# - If we want to make the SD larger:
+#   - If in step 1 we chose an element to increment, there is no point in now changing (decrementing) a larger one
+#   - If in step 1 we chose an element to decrement, there is no point in now changing (incrementing) a smaller one
+# - If we want to make the SD smaller:
+#   - If in step 1 we chose an element to increment, there is no point in now changing (decrementing) a smaller one
+#   - If in step 1 we chose an element to decrement, there is no point in now changing (incrementing) a larger one
+# There is also no point in incrementing an element that is equal to the new value of the one that we have already chosen.
+    noPoint2 <- (   (if (increaseSD == incFirst) (vec > willBump1) else (vec < willBump1))
+                  | (vec == (willBump1 + delta1))
+                )
+    indexCanBump2Try <- indexCanBump2 & (! noPoint2)
+    if (sum(indexCanBump2Try) > 0) {
+      indexCanBump2 <- indexCanBump2Try
     }
+
+    whichCanBump2 <- which(indexCanBump2)
+    whichWillBump2 <- whichCanBump2[as.integer(runif(1) * length(whichCanBump2)) + 1];
+    vec[whichWillBump2] <- vec[whichWillBump2] + delta2
   }
 
   return(vec)
@@ -282,7 +349,10 @@ rSprite.chartLabel <- function (N, tMean, tSD, scaleMin, scaleMax, dp, splitLine
 rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(), label) {
 # Generate some random starting data.
   rN <- N - length(fixed)
-  vec <- pmax(pmin(as.integer(runif(rN) * 2 * tMean), scaleMax), scaleMin)
+  scaleMinZB <- 0
+  scaleMaxZB <- scaleMax - scaleMin
+  tMeanZB <- tMean - scaleMin
+  vec <- pmax(pmin(as.integer(runif(rN) * (2 * tMean + 1)), scaleMax), scaleMin)
   result <- c()
 
   if (length(fixed) > 0) {         # replace any of the fixed numbers with a random non-fixed number
@@ -292,7 +362,7 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
   }
 
 # Adjust mean of starting data.
-  gran <- ((0.1 ^ dp) / 2) + rSprite.dust   # allow for rounding errors
+  granule <- ((0.1 ^ dp) / 2) + rSprite.dust   # allow for rounding errors
   meanOK <- FALSE
   maxStartLoops <- N * (scaleMax - scaleMin)
 
@@ -300,7 +370,7 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
     fullVec <- c(vec, fixed)
     cMean <- mean(fullVec)
     dif <- abs(cMean - tMean)
-    if (dif < gran) {
+    if (dif < granule) {
       meanOK <- TRUE
       break;
     }
@@ -308,7 +378,9 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
 # Identify numbers that we can increment or decrement.
 # This should exclude numbers that would become one of the fixed values.
     deltaMean <- 1
-    if (runif(1) < 0.2) {
+    if (    (length(fixed) > 0)
+         && (runif(1) < 0.2)
+    ) {
       deltaMean <- 2       # This allows us to "jump over" the fixed values, if they are not at the extremities.
     }
 
@@ -326,26 +398,22 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
   }
 
   if (!meanOK) {
-    s <- "Couldn't initialize data with correct mean"  # This is actually a coding error if mean is in range
+    s <- "Couldn't initialize data with correct mean"  # this probably indicates a coding error, if the mean is in range
     rSprite.message(s, shinyType="error")
     return(result)
   }
 
-  maxLoops <- max(round(N * ((scaleMax - scaleMin) ^ 2)), 1000)  # this maybe needs some more testing for pathological conditions
+  maxLoops <- min(max(round(N * ((scaleMax - scaleMin) ^ 2)), rSprite.maxDeltaLoopsLower), rSprite.maxDeltaLoopsUpper)
   found <- FALSE
-  gran <- ((0.1 ^ dp) / 2) + rSprite.dust   # allow for rounding errors
 
   for (i in 1:maxLoops) {
     cSD <- sd(c(vec, fixed))
-    if (abs(cSD - tSD) <= gran) {
+    if (abs(cSD - tSD) <= granule) {
       result <- vec
       break
     }
 
     vec <- rSprite.delta(vec, tMean, tSD, scaleMin, scaleMax, dp, fixed)
-    if (length(vec) == 0) {    # rSprite.delta() failed (but may have generated its own message(s)).
-      break
-    }
   }
 
   return(result)
@@ -386,25 +454,21 @@ rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2
   }
 
   result$rows <- c()
+  nCases <- 0
   result$label <- rSprite.chartLabel(N, tMean, tSD, scaleMin, scaleMax, dp, (maxCases > 9))
-  for (i in 1:(maxCases * 8)) {   # 8 is arbitrary; break early if we find enough unique cases.
+  for (i in 1:(maxCases * rSprite.maxDupLoops)) {
     vec <- rSprite.seekVector(N, tMean, tSD, scaleMin, scaleMax, dp, fixed, result$label)
-    if (length(vec) == 0) {       # If no solution was found on this run, return any we found up to now.
-      if (length(result$rows) == 0) {
-        s <- paste("No solution found for ", paste(result$label, collapse=" "), sep="")
-        rSprite.message(s, shinyType="warning")
-      }
-
-      return(result)              # This may be slightly unsatisfactory if solutions are just very hard to come by.
+    if (length(vec) == 0) {
+      break                                 # we failed to find a case despite many tries
     }
 
-    fullVec <- sort(c(vec, fixed))         # Sorting lets us find duplicates more easily.
+    fullVec <- sort(c(vec, fixed))          # sorting lets us find duplicates more easily
     if (length(result$rows) == 0) {
       result$rows <- matrix(fullVec, nrow=1)
     }
     else {
       newRows <- rbind(result$rows, fullVec)
-      if (tail(duplicated(newRows), 1)) {  # The solution we just found is a duplicate.
+      if (tail(duplicated(newRows), 1)) {   # the solution we just found is a duplicate
         dups <- dups + 1
         if (dups > maxDups) {
           break
@@ -418,8 +482,10 @@ rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2
     }
 
     nCases <- nrow(result$rows)
-    if (nCases == maxCases) {
-      incomplete <- FALSE
+    s <- paste("Found ", nCases, " unique solution", (if (nCases == 1) "" else "s"), sep="")
+    rSprite.message(s, showNow=TRUE)    # progress counter
+
+    if (nCases >= maxCases) {           # we have enough cases now
       break
     }
 
@@ -432,8 +498,14 @@ rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2
   }
 
   if (nCases < maxCases) {
-    was <- if (nCases == 1) "was" else "were"
-    s <- paste(maxCases, " unique examples were requested, but only ", nrow(result$rows), " ", was, " found", sep="")
+    if (nCases == 0) {
+      s <- paste("No solution found for ", paste(result$label, collapse=" "), sep="")
+    }
+    else {
+      was <- if (nCases == 1) "was" else "were"
+      s <- paste(maxCases, " unique solutions were requested, but only ", nrow(result$rows), " ", was, " found", sep="")
+    }
+
     rSprite.message(s, shinyType="warning")
   }
 
@@ -496,7 +568,12 @@ rSprite.buildOneChart <- function (vec, scaleMin, scaleMax, gridSize, xMax, yMax
 # Build a grid containing all the results charts.
 rSprite.buildCharts <- function (sample, scaleMin, scaleMax, gridSize) {
   rows <- sample$rows
-  if (nrow(rows) > 1) {
+
+  nCases <- nrow(rows)
+  s <- paste("Plotting ", nCases, " unique solution", (if (nCases == 1) "" else "s"), "...", sep="")
+  rSprite.message(s, showNow=TRUE)
+
+  if (nCases > 1) {
     rows <- rows[order(apply(rows, 1, skewness)),]
   }
 
@@ -569,6 +646,9 @@ rSprite.prevHelp <<- 0
 rSprite.plotData <<- c()
 
 server <- function (input, output, session) {
+  debounced_tMean <- debounce(input$tMean, 1000)
+  debounced_tSD <- debounce(input$tSD, 1000)
+
   fixedCount <- reactive({
     result <- 0
     sn <- gsub(" ", "", input$fixedCount)
@@ -620,7 +700,7 @@ server <- function (input, output, session) {
   })
 
   reactiveSample <- eventReactive(input$go, {
-    rSprite.message("Calculating...", shinyNow=TRUE)
+    rSprite.message("Calculating...", showNow=TRUE)
     set.seed(if (input$fixedSeed) 1 else as.numeric(Sys.time()))
     fixed <- rep(fixedResponse(), fixedCount())
     gridSize <- sqrt(as.numeric(input$gridSize))
@@ -637,12 +717,14 @@ server <- function (input, output, session) {
     )
   })
 
-# This element is just a place to catch and handle changes in the input controls and their relations to each other.
+# This element is just a placeholder to catch and handle changes in the input controls and their relations to each other.
 # We never actually output anything to a text box.
   output$dummy <- renderText({
     N <- input$N
-    tMean <- input$tMean
-    tSD <- input$tSD
+#bounce    tMean <- input$tMean
+    tMean <- debounced_tMean()    #bounce
+#bounce    tSD <- input$tSD
+    tSD <- debounced_tSD()        #bounce
     scaleMin <- input$scaleMin
     scaleMax <- input$scaleMax
     dp <- input$dp
@@ -650,8 +732,8 @@ server <- function (input, output, session) {
 
     updateNumericInput(session, inputId="scaleMin", max=(scaleMax - 1))
     updateNumericInput(session, inputId="scaleMax", min=(scaleMin + 1))
-    updateNumericInput(session, inputId="tMean", min=scaleMin, max=scaleMax, step=dstep)
-    updateNumericInput(session, inputId="tMean", min=0, max=(((scaleMax - scaleMin) / 2) + 1), step=dstep)
+    updateNumericInput(session, inputId="tMean", min=scaleMin, max=scaleMax, step=dstep)  #limits
+    updateNumericInput(session, inputId="tSD", min=0, max=(((scaleMax - scaleMin) / 2) + 1), step=dstep)  #limits
 
 # It is tempting to force the mean value to a GRIM-consistent one here
 #  (cf. what we do for the SD below), but this would be an error,
@@ -662,7 +744,7 @@ server <- function (input, output, session) {
     if (!is.na(tMean)) {
       newMean <- max(min(round(tMean, dp), scaleMax), scaleMin)
       if (newMean != tMean) {
-        updateNumericInput(session, inputId="tMean", value=newMean)
+        updateNumericInput(session, inputId="tMean", value=newMean) #limits
       }
     }
 
@@ -735,12 +817,12 @@ server <- function (input, output, session) {
         if (    (gridSize == 10)
              && (session$clientData$url_hostname == "127.0.0.1")        # On developer's local screen...
            ) {                                                          # ... don't show 10x10 grid...
-          rSprite.message("Skipping rendering", shinyNow=TRUE)          # ... to speed up generation of test data.
+          rSprite.message("Skipping rendering", showNow=TRUE)           # ... to speed up generation of test data.
         }
         else {
           gridSize <- floor(sqrt(nrow(sample$rows)) + 0.999)
           rSprite.buildCharts(sample, scaleMin, scaleMax, gridSize)
-          rSprite.message("Rendering...", shinyNow=TRUE)
+          rSprite.message("Rendering...", showNow=TRUE)
         }
 
         rSprite.plotData <<- sample$rows
@@ -780,16 +862,18 @@ fixedSeed <- 0
 dstep <- c(0.1, 0.01, 0.001)[dp]
 
 ui <- fluidPage(
-  titlePanel("rSPRITE beta 0.15")
+  titlePanel("rSPRITE beta 0.16")
 , sidebarLayout(
     position="left"
   , sidebarPanel(
       width=2
     , numericInput(inputId="scaleMin", label="Minimum scale value", value=scaleMin, min=-20, max=1, step=1)
     , numericInput(inputId="scaleMax", label="Maximum scale value", value=scaleMax, min=2, max=50, step=1)
-    , numericInput(inputId="N", label="Sample size", value=N, min=2, max=1000, step=1)
+    , numericInput(inputId="N", label="Sample size", value=N, min=2, max=10000, step=1)
     , numericInput(inputId="tMean", label="Target mean", value=round(tMean, dp), min=scaleMin, max=scaleMax, step=dstep)
+#limits    , numericInput(inputId="tMean", label="Target mean", value=round(tMean, dp), step=dstep)  #limits
     , numericInput(inputId="tSD", label="Target SD", value=round(tSD, dp), min=0, max=(((scaleMax - scaleMin) / 2) + 1), step=dstep)
+#limits    , numericInput(inputId="tSD", label="Target SD", value=round(tSD, dp), step=dstep)  #limits
     , numericInput(inputId="dp", label="Decimal places", value=dp, min=1, max=3, step=1)
     , selectInput(inputId="gridSize", label="Number of results", choices=(c(1:10) ^ 2), selected=9)
     , fluidRow(
@@ -841,3 +925,4 @@ if (1) {
   shinyApp(ui=ui, server=server)
 }
 
+#rsconnect::deployApp("~/Academic/rSPRITE/rSPRITE")

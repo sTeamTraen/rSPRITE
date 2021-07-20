@@ -1,4 +1,4 @@
-# Written by Nick Brown (nicholasjlbrown@gmail.com), 2018-2020.
+# Written by Nick Brown (nicholasjlbrown@gmail.com), 2018-2021.
 # This work is licensed under a Creative Commons Attribution 4.0 International License (CC-BY).
 #  See http://creativecommons.org/licenses/by/4.0/
 # Thanks to Cédric Batailler for help with the X-axis.
@@ -78,11 +78,16 @@
 #   Changed performance parameters to reduce the chance of missing a valid solution, especially with fixed values.
 #   Added a progress counter to keep track of unique solutions as they are found.
 #   Added a message to indicate when searching has finished and plotting of the results has started.
+# 2021-07-20 ??:?? UTC 0.17
+#   Allowed the number of a fixed value to be set to zero (i.e., that value will not appear in the generated sample).
+#   Allowed decimal places to be set to zero.
+#   Added link to GitHub.
+#   Fixed a bug that could cause the display to be distorted if the X-axis started at a value above 0.
+#   Removed bounds on scale maximum/minimum input values. Caveat usor.
+#   Fixed a bug that could cause no solution to be found when fixed values were used and there was a small number of possible solutions.
 
-# To do (some of these could be hard):
-# Check when to turn X-axis numbers sideways, eg 13-77 N=345 M=26 SD=12, one pane.
-# Allow zero as a number of a fixed value (i.e., that value explicitly does not appear).
-# Idea: If no solution is found, print SD of nearest solution.
+# To do:
+# - If no solution is found, print SD of nearest solution.
 
 library(ggplot2)
 library(gridExtra)
@@ -94,12 +99,12 @@ library(shiny)
 #  it is the lower bound on a formula that includes the sample size and range.
 # maxDeltaLoopsUpper is the absolute upper bound on that formula (a sanity check, in effect).
 # maxDupLoops controls how many times we try to find another unique solution, when we know that at least one exists.
-rSprite.maxDeltaLoopsLower <- 10000
+rSprite.maxDeltaLoopsLower <- 20000
 rSprite.maxDeltaLoopsUpper <- 1000000
-rSprite.maxDupLoops <- 8
+rSprite.maxDupLoops <- 20
 
 # Code taken from https://gist.github.com/jcheng5/6141ea7066e62cafb31c
-# Returns a reactive that debounces the given expression by the given time in milliseconds.
+# Returns a reactive element that debounces the given expression by the given time in milliseconds.
 #
 # This is not a true debounce in that it will not prevent \code{expr} from being called many times
 #  (in fact it may be called more times than usual), but rather, the reactive invalidation signal that is
@@ -216,9 +221,16 @@ rSprite.sdLimits <- function (N, tMean, scaleMin, scaleMax, dp) {
 # This will usually subtract 1 (or 2) from one element and add the same to another,
 #  thus preserving the mean, but occasionally it will just do one of those things,
 #  if the resulting mean is still GRIM-consistent.
-rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c()) {
+rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(), never=c()) {
   originalVec <- vec
-
+  avoid <- NA
+  if (length(fixed) > 0) {
+    avoid <- fixed[1]
+  }
+  else if (length(never) > 0) {
+    avoid <- never[1]
+  }
+  
 # Decide if we want to increment or decrement first.
   incFirst <- (runif(1) < 0.5)
 
@@ -226,9 +238,9 @@ rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c())
   fullVec <- c(vec, fixed)
   increaseSD <- (sd(fullVec) < tSD)
 
-# Most of the time we change a pair of numbers by +/- 1, but changing by +/- 2 allows us to jump over fixed numbers.
+# Most of the time we change a pair of numbers by +/- 1, but changing by +/- 2 allows us to jump over fixed or "never" numbers.
   absDelta <- 1
-  if (    (length(fixed) > 0)
+  if (    !is.na(avoid)
        && (runif(1) < 0.2)
      ) {
     # Check there is at least one number that we can increment or decrement by 2!
@@ -248,8 +260,8 @@ rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c())
   delta1 <- if (incFirst) absDelta else -absDelta     # actual value we will add when bumping first number
 
 # The element that we change should be less than the maximum (increment) or greater than the minimum (decrement).
-# It should also not be <delta> less/greater than a fixed value (because adding delta would give us the fixed value).
-  notFixed1 <- if (length(fixed) > 0) !(vec %in% (fixed - delta1)) else TRUE
+# It should also not be <delta> less/greater than a fixed/"never" value (because adding delta would give us that value).
+  notFixed1 <- if (!is.na(avoid)) (vec != (avoid - delta1)) else TRUE
   notEdge1 <- if (delta1 > 0) (vec <= maxToInc) else (vec >= minToDec)
   indexCanBump1 <- uniqueCanBump1 & notFixed1 & notEdge1
 
@@ -290,7 +302,7 @@ rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c())
     vecBump2 <- vec                            # make a scratch copy of the input vector so we can change it
     vecBump2[whichWillBump1] <- rSprite.huge   # remove the element chosen in part 1...
     uniqueCanBump2 <- !duplicated(vecBump2)    # ... but if there was more than one copy of that, it's still a candidate
-    notFixed2 <- if (length(fixed) > 0) !(vec %in% (fixed - delta2)) else TRUE
+    notFixed2 <- if (!is.na(avoid)) (vec != (avoid - delta2)) else TRUE
     notEdge2 <- if (delta2 > 0) (vec <= maxToInc) else (vec >= minToDec)
     indexCanBump2 <- uniqueCanBump2 & notFixed2 & notEdge2 & (vecBump2 != rSprite.huge)
 
@@ -346,7 +358,15 @@ rSprite.chartLabel <- function (N, tMean, tSD, scaleMin, scaleMax, dp, splitLine
 
 # Find a single vector of responses that matches the target mean and SD.
 # Assumes that the mean has been checked for GRIM consistency (see rSprite.getSample).
-rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(), label) {
+rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(), never=c(), label) {
+  avoid <- NA
+  if (length(fixed) > 0) {
+    avoid <- fixed[1]
+  }
+  else if (length(never) > 0) {
+    avoid <- never[1]
+  }
+
 # Generate some random starting data.
   rN <- N - length(fixed)
   scaleMinZB <- 0
@@ -355,9 +375,9 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
   vec <- pmax(pmin(as.integer(runif(rN) * (2 * tMean + 1)), scaleMax), scaleMin)
   result <- c()
 
-  if (length(fixed) > 0) {         # replace any of the fixed numbers with a random non-fixed number
-    whichFixed <- which(vec %in% fixed)
-    notFixed <- sample(setdiff(scaleMin:scaleMax, fixed), length(whichFixed), replace=TRUE)
+  if (!is.na(avoid)) {         # replace any of the fixed numbers with a random non-fixed number
+    whichFixed <- which(vec == avoid)
+    notFixed <- sample(setdiff(min(vec):max(vec), avoid), length(whichFixed), replace=TRUE)
     vec[whichFixed] <- notFixed
   }
 
@@ -378,18 +398,24 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
 # Identify numbers that we can increment or decrement.
 # This should exclude numbers that would become one of the fixed values.
     deltaMean <- 1
-    if (    (length(fixed) > 0)
+    if (    !is.na(avoid)
          && (runif(1) < 0.2)
     ) {
-      deltaMean <- 2       # This allows us to "jump over" the fixed values, if they are not at the extremities.
+      deltaMean <- 2       # This allows us to "jump over" the fixed/"never" values, if they are not at the extremities.
     }
 
     increaseMean <- (cMean < tMean)
     if (increaseMean) {
-      filter <- (vec < (scaleMax - deltaMean + 1)) & (!(vec %in% (fixed - deltaMean)))
+      filter <- (vec < (scaleMax - deltaMean + 1))
+      if (!is.na(avoid)) {
+        filter <- filter & (vec != (avoid - deltaMean))
+      }
     }
     else {
-      filter <- (vec > (scaleMin + deltaMean - 1)) & (!(vec %in% (fixed + deltaMean)))
+      filter <- (vec > (scaleMin + deltaMean - 1))
+      if (!is.na(avoid)) {
+        filter <- filter & (vec != (avoid + deltaMean))
+      }
     }
 
     canBumpMean <- which(filter)
@@ -413,14 +439,14 @@ rSprite.seekVector <- function (N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c
       break
     }
 
-    vec <- rSprite.delta(vec, tMean, tSD, scaleMin, scaleMax, dp, fixed)
+    vec <- rSprite.delta(vec, tMean, tSD, scaleMin, scaleMax, dp, fixed, never)
   }
 
   return(result)
 }
 
 # Generate a sample of one or more unique SPRITE solutions.
-rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c()) {
+rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(), never=c()) {
   result <- list(rows=c(), label="")
 
 # Check mean is possible with GRIM; if not, identify the nearest valid mean.
@@ -448,7 +474,7 @@ rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2
   }
 
   if (scaleMin >= scaleMax) {
-    s <- paste("Scale minimum should be smaller than maximum")
+    s <- paste("Scale minimum should be less than maximum")
     rSprite.message(s, shinyType="warning")
     return(result)
   }
@@ -457,7 +483,7 @@ rSprite.getSample <- function (maxCases, N, tMean, tSD, scaleMin, scaleMax, dp=2
   nCases <- 0
   result$label <- rSprite.chartLabel(N, tMean, tSD, scaleMin, scaleMax, dp, (maxCases > 9))
   for (i in 1:(maxCases * rSprite.maxDupLoops)) {
-    vec <- rSprite.seekVector(N, tMean, tSD, scaleMin, scaleMax, dp, fixed, result$label)
+    vec <- rSprite.seekVector(N, tMean, tSD, scaleMin, scaleMax, dp, fixed, never, result$label)
     if (length(vec) == 0) {
       break                                 # we failed to find a case despite many tries
     }
@@ -553,7 +579,8 @@ rSprite.buildOneChart <- function (vec, scaleMin, scaleMax, gridSize, xMax, yMax
       labelTextSize <- axisTitleSize * 0.352778 * (1 - (0.1 * (gridSize >= 8)))     # see StackOverflow 36547590
       labelText <- paste(label, collapse="\n")
       labelY <- (yLimit + 1 - llen) - (gridSize >= 5) - (gridSize >= 7)
-      grob <- grob + annotate("text", x=round((xLimit + scaleMin) / 2), y=labelY, label=labelText, size=labelTextSize)
+      labelX <- round((xLimit - scaleMin) / 2) + 1
+      grob <- grob + annotate("text", x=labelX, y=labelY, label=labelText, size=labelTextSize)
     }
   }
 
@@ -630,6 +657,8 @@ rSprite.helpText <- c(
   , " Like any tool, it has the potential to be used incorrectly."
   , " If you ask it do something silly, it will do it, very probably without warning you."
   , "<br/><br/>"
+  , "If you want to run rSPRITE on your own computer, or just see how it works, the source code is available <a href=https://github.com/sTeamTraen/rSPRITE>here</a>."
+  , "<br/><br/>"
   , "For more information on SPRITE in general, see <a href=https://peerj.com/preprints/26968v1/>here</a>."
   , "<br/><br/>"
   , "Please report bugs to nicholasjlbrown@gmail.com"
@@ -650,50 +679,50 @@ server <- function (input, output, session) {
   debounced_tSD <- debounce(input$tSD, 1000)
 
   fixedCount <- reactive({
-    result <- 0
+    result <- NA
     sn <- gsub(" ", "", input$fixedCount)
     if (sn != "") {
       result <- rSprite.huge
       if (grepl("^[0-9]+$", sn)) {
         f <- as.numeric(sn)
-        if ((f > 0) && (f < input$N)) {
+        if ((f >= 0) && (f < input$N)) {
           result <- f
         }
       }
-    }
 
-    if (result == rSprite.huge) {
-      s <- paste("Fixed count must be an integer from 1 to ", (input$N - 1)
-               , "; input |", input$fixedCount
-               , "| ignored"
-               , sep=""
-      )
-      rSprite.message(s, shinyType="warning")
-      result <- 0
+      if (result == rSprite.huge) {
+        s <- paste("Fixed count must be an integer from 0 to ", (input$N - 1)
+                 , "; input |", input$fixedCount
+                 , "| ignored"
+                 , sep=""
+        )
+        rSprite.message(s, shinyType="warning")
+        result <- NA
+      }
     }
 
     result
   })
 
   fixedResponse <- reactive({
-    result <- 0
+    result <- NA
     sn <- gsub(" ", "", input$fixedResponse)
     if (sn != "") {
       result <- rSprite.huge
       if (grepl("^-?[0-9]+$", sn)) {
         result <- as.numeric(sn)
       }
-    }
 
-    if (result == rSprite.huge) {
-      s <- paste("Fixed value must be an integer from ", input$scaleMin
-               , " to ", input$scaleMax
-               , "; input |", input$fixedResponse
-               , "| ignored"
-               , sep=""
-      )
-      rSprite.message(s, shinyType="warning")
-      result <- 0
+      if (result == rSprite.huge) {
+        s <- paste("Fixed value must be an integer from ", input$scaleMin
+                 , " to ", input$scaleMax
+                 , "; input |", input$fixedResponse
+                 , "| ignored"
+                 , sep=""
+        )
+        rSprite.message(s, shinyType="warning")
+        result <- NA
+      }
     }
 
     result
@@ -702,7 +731,19 @@ server <- function (input, output, session) {
   reactiveSample <- eventReactive(input$go, {
     rSprite.message("Calculating...", showNow=TRUE)
     set.seed(if (input$fixedSeed) 1 else as.numeric(Sys.time()))
-    fixed <- rep(fixedResponse(), fixedCount())
+    fResponse <- fixedResponse()
+    fCount <- fixedCount()
+    fixed <- c()
+    never <- c()
+    if (!is.na(fCount) && !is.na(fResponse)) {
+      if (fCount == 0) {
+        never <- fResponse
+      }
+      else {
+        fixed <- rep(fResponse, fCount)
+      }
+    }
+
     gridSize <- sqrt(as.numeric(input$gridSize))
 
     rSprite.getSample(
@@ -714,6 +755,7 @@ server <- function (input, output, session) {
     , input$scaleMax
     , input$dp
     , fixed
+    , never
     )
   })
 
@@ -728,7 +770,7 @@ server <- function (input, output, session) {
     scaleMin <- input$scaleMin
     scaleMax <- input$scaleMax
     dp <- input$dp
-    dstep <- c(0.1, 0.01, 0.001)[dp]
+    dstep <- c(1, 0.1, 0.01, 0.001)[(dp + 1)]
 
     updateNumericInput(session, inputId="scaleMin", max=(scaleMax - 1))
     updateNumericInput(session, inputId="scaleMax", min=(scaleMin + 1))
@@ -754,7 +796,7 @@ server <- function (input, output, session) {
     if (!is.na(tSD)) {
       newSD <- max(min(round(tSD, dp), scaleMax), 0)
       if (newSD != tSD) {
-        updateNumericInput(session, inputId="tSD", value=newSD)
+        updateNumericInput(session, inputId="tSD", value=newSD) #limits
       }
     }
 
@@ -840,9 +882,9 @@ server <- function (input, output, session) {
 #---------- Two-file version: Beginning of ui.R (but remove trailing if(1)) ----------
 library(shinycssloaders)
 
-N <- 45
-tMean <- 3.532
-tSD <- 1.561
+N <- 50
+tMean <- 4.12
+tSD <- 1.48
 dp <- 2
 scaleMin <- 1
 scaleMax <- 7
@@ -859,22 +901,22 @@ fixedSeed <- 0
 #fixedCount <- 21
 #fixedSeed <- 1
 
-dstep <- c(0.1, 0.01, 0.001)[dp]
+dstep <- c(1, 0.1, 0.01, 0.001)[(dp + 1)]
 
 ui <- fluidPage(
-  titlePanel("rSPRITE beta 0.16")
+  titlePanel("rSPRITE beta 0.17")
 , sidebarLayout(
     position="left"
   , sidebarPanel(
       width=2
-    , numericInput(inputId="scaleMin", label="Minimum scale value", value=scaleMin, min=-20, max=1, step=1)
-    , numericInput(inputId="scaleMax", label="Maximum scale value", value=scaleMax, min=2, max=50, step=1)
+    , numericInput(inputId="scaleMin", label="Minimum scale value", value=scaleMin, step=1) ##, min=-20, max=1)
+    , numericInput(inputId="scaleMax", label="Maximum scale value", value=scaleMax, step=1) ##, min=2, max=50)
     , numericInput(inputId="N", label="Sample size", value=N, min=2, max=10000, step=1)
     , numericInput(inputId="tMean", label="Target mean", value=round(tMean, dp), min=scaleMin, max=scaleMax, step=dstep)
 #limits    , numericInput(inputId="tMean", label="Target mean", value=round(tMean, dp), step=dstep)  #limits
     , numericInput(inputId="tSD", label="Target SD", value=round(tSD, dp), min=0, max=(((scaleMax - scaleMin) / 2) + 1), step=dstep)
 #limits    , numericInput(inputId="tSD", label="Target SD", value=round(tSD, dp), step=dstep)  #limits
-    , numericInput(inputId="dp", label="Decimal places", value=dp, min=1, max=3, step=1)
+    , numericInput(inputId="dp", label="Decimal places", value=dp, min=0, max=3, step=1)
     , selectInput(inputId="gridSize", label="Number of results", choices=(c(1:10) ^ 2), selected=9)
     , fluidRow(
         column(

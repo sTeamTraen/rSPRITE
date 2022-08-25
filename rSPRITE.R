@@ -78,16 +78,20 @@
 #   Changed performance parameters to reduce the chance of missing a valid solution, especially with fixed values.
 #   Added a progress counter to keep track of unique solutions as they are found.
 #   Added a message to indicate when searching has finished and plotting of the results has started.
-# 2021-07-20 ??:?? UTC 0.17
+# 2021-07-20 17:10 UTC 0.17
 #   Allowed the number of a fixed value to be set to zero (i.e., that value will not appear in the generated sample).
 #   Allowed decimal places to be set to zero.
 #   Added link to GitHub.
 #   Fixed a bug that could cause the display to be distorted if the X-axis started at a value above 0.
 #   Removed bounds on scale maximum/minimum input values. Caveat usor.
 #   Fixed a bug that could cause no solution to be found when fixed values were used and there was a small number of possible solutions.
+# 2022-08-25 20:35 UTC 0.18
+#   Documented the fact that the forced count of a value can be zero.
+#   Force input values for scale minimum and maximum to be integers.
+#   Improvemed the determination of the limits of the SD, cf.
+#    https://github.com/sTeamTraen/rSPRITE/issues/1 (h/t Lukas Wallrich).
 
 # To do:
-# - If no solution is found, print SD of nearest solution.
 
 library(ggplot2)
 library(gridExtra)
@@ -205,12 +209,14 @@ rSprite.sdLimits <- function (N, tMean, scaleMin, scaleMax, dp) {
     k <- min(max(k, 1), N - 1)               # ensure there is at least one of each of two numbers
     vec <- c(rep(a, k), rep(b, N - k))
     diff <- sum(vec) - total
-    if ((diff < 0) && (k > 1)) {
-      vec <- c(rep(a, k - 1), abs(diff), rep(b, N - k))
+
+    if (diff < 0) {
+      vec <- c(rep(a, k - 1), a + abs(diff), rep(b, N - k))
     }
-    else if ((diff > 0) && ((N - k) > 1)) {
-      vec <- c(rep(a, k), diff, rep(b, N - k - 1))
+    else if (diff > 0) {
+      vec <- c(rep(a, k), b - diff, rep(b, N - k - 1))
     }
+
     result[m] <- round(sd(vec), dp)
   }
 
@@ -230,7 +236,7 @@ rSprite.delta <- function (vec, tMean, tSD, scaleMin, scaleMax, dp=2, fixed=c(),
   else if (length(never) > 0) {
     avoid <- never[1]
   }
-  
+
 # Decide if we want to increment or decrement first.
   incFirst <- (runif(1) < 0.5)
 
@@ -642,7 +648,7 @@ rSprite.helpText <- c(
   , "<br/><br/>"
   , "Optionally, you can provide a fixed value and a count;"
   , " this forces every sample to contain exactly that many occurrences of that value,"
-  , " which may be outside the scale range."
+  , " which may be outside the scale range. That number of occurrences can be zero."
   , "<br/><br/>"
   , "You can also download the individual values that make up the bar charts to a CSV file."
   , "<br/><br/>"
@@ -767,13 +773,13 @@ server <- function (input, output, session) {
     tMean <- debounced_tMean()    #bounce
 #bounce    tSD <- input$tSD
     tSD <- debounced_tSD()        #bounce
-    scaleMin <- input$scaleMin
-    scaleMax <- input$scaleMax
+    scaleMin <- round(input$scaleMin, 0)
+    scaleMax <- round(input$scaleMax, 0)
     dp <- input$dp
     dstep <- c(1, 0.1, 0.01, 0.001)[(dp + 1)]
 
-    updateNumericInput(session, inputId="scaleMin", max=(scaleMax - 1))
-    updateNumericInput(session, inputId="scaleMax", min=(scaleMin + 1))
+    updateNumericInput(session, inputId="scaleMin", max=(scaleMax - 1), value=scaleMin)
+    updateNumericInput(session, inputId="scaleMax", min=(scaleMin + 1), value=scaleMax)
     updateNumericInput(session, inputId="tMean", min=scaleMin, max=scaleMax, step=dstep)  #limits
     updateNumericInput(session, inputId="tSD", min=0, max=(((scaleMax - scaleMin) / 2) + 1), step=dstep)  #limits
 
@@ -892,19 +898,10 @@ fixedValue <- ""
 fixedCount <- ""
 fixedSeed <- 0
 
-#tMean <- 19.4
-#tSD <- 19.9
-#dp <- 1
-#scaleMin <- 0
-#scaleMax <- 41
-#fixedValue <- 0
-#fixedCount <- 21
-#fixedSeed <- 1
-
 dstep <- c(1, 0.1, 0.01, 0.001)[(dp + 1)]
 
 ui <- fluidPage(
-  titlePanel("rSPRITE beta 0.17")
+  titlePanel("rSPRITE beta 0.18")
 , sidebarLayout(
     position="left"
   , sidebarPanel(
